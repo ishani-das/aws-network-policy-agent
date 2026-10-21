@@ -310,36 +310,40 @@ func (r *ClusterPolicyEndpointsReconciler) configureClusterPolicyBPFProbes(podId
 
 func (r *ClusterPolicyEndpointsReconciler) updateClusterPolicyBPFMaps(podIdentifier string, ingressRules, egressRules []fwrp.EbpfFirewallRules) error {
 
-	state := ebpf.POLICIES_APPLIED
+	// Hold the per-podIdentifier lock across the whole "write rules, then flip
+	// pod_state" sequence.
+	return r.ebpfClient.WithPodIdentifierLock(podIdentifier, func() error {
+		state := ebpf.POLICIES_APPLIED
 
-	err := r.ebpfClient.UpdateClusterPolicyEbpfMaps(podIdentifier, ingressRules, egressRules)
-	if err != nil {
-		log().Errorf("Cluster Policy Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
+		err := r.ebpfClient.UpdateClusterPolicyEbpfMaps(podIdentifier, ingressRules, egressRules)
+		if err != nil {
+			log().Errorf("Cluster Policy Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
 
-	if len(ingressRules) == 0 && len(egressRules) == 0 {
-		// Default state for cluster network policies when no rules are applied
-		state = ebpf.DEFAULT_ALLOW
-	}
+		if len(ingressRules) == 0 && len(egressRules) == 0 {
+			// Default state for cluster network policies when no rules are applied
+			state = ebpf.DEFAULT_ALLOW
+		}
 
-	err = r.ebpfClient.UpdatePodStateEbpfMaps(podIdentifier, ebpf.CLUSTER_POLICY_POD_STATE_MAP_KEY, state, true, true)
-	if err != nil {
-		log().Errorf("Cluster Policy pod state maps update(s) failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
+		err = r.ebpfClient.UpdatePodStateEbpfMaps(podIdentifier, ebpf.CLUSTER_POLICY_POD_STATE_MAP_KEY, state, true, true)
+		if err != nil {
+			log().Errorf("Cluster Policy pod state maps update(s) failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
 
-	defaultState := ebpf.DEFAULT_ALLOW
-	if utils.IsStrictMode(r.ebpfClient.GetNetworkPolicyMode()) {
-		defaultState = ebpf.DEFAULT_DENY
-	}
+		defaultState := ebpf.DEFAULT_ALLOW
+		if utils.IsStrictMode(r.ebpfClient.GetNetworkPolicyMode()) {
+			defaultState = ebpf.DEFAULT_DENY
+		}
 
-	// TODO: Can be optimized to avoid redundant createIfNotExists calls
-	if err := r.ebpfClient.CreatePodStateEbpfEntryIfNotExists(podIdentifier, ebpf.POD_STATE_MAP_KEY, defaultState); err != nil {
-		log().Errorf("Pod-state seed failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
-	return nil
+		// TODO: Can be optimized to avoid redundant createIfNotExists calls
+		if err := r.ebpfClient.CreatePodStateEbpfEntryIfNotExists(podIdentifier, ebpf.POD_STATE_MAP_KEY, defaultState); err != nil {
+			log().Errorf("Pod-state seed failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *ClusterPolicyEndpointsReconciler) deriveClusterPolicyIngressAndEgressFirewallRules(ctx context.Context, podIdentifier string, resourceName string, isDeleteFlow bool) ([]fwrp.EbpfFirewallRules, []fwrp.EbpfFirewallRules, error) {

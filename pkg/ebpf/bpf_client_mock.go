@@ -241,3 +241,8 @@ func (m *MockBpfClient) contextErr(podIdentifier string) error {
 	}
 	return nil
 }
+
+func (m *MockBpfClient) WithPodIdentifierLock(podIdentifier string, fn func() error) error {
+	m.CallLog = append(m.CallLog, "WithPodIdentifierLock")
+	return fn()
+}

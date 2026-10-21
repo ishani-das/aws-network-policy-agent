@@ -1314,23 +1314,23 @@ func TestUpdateeBPFMaps_FailClosed(t *testing.T) {
 			name:       "rule-map failure short-circuits before pod-state",
 			ruleMapErr: ruleMapErr,
 			wantErr:    ruleMapErr,
-			wantCalls:  []string{"UpdateEbpfMaps"},
+			wantCalls:  []string{"WithPodIdentifierLock", "UpdateEbpfMaps"},
 		},
 		{
 			name:        "pod-state failure surfaces",
 			podStateErr: podStateErr,
 			wantErr:     podStateErr,
-			wantCalls:   []string{"UpdateEbpfMaps", "UpdatePodStateEbpfMaps"},
+			wantCalls:   []string{"WithPodIdentifierLock", "UpdateEbpfMaps", "UpdatePodStateEbpfMaps"},
 		},
 		{
 			name:           "createIfNotExists seed failure surfaces",
 			createEntryErr: createEntryErr,
 			wantErr:        createEntryErr,
-			wantCalls:      []string{"UpdateEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
+			wantCalls:      []string{"WithPodIdentifierLock", "UpdateEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
 		},
 		{
 			name:      "happy path returns nil and runs the full sequence",
-			wantCalls: []string{"UpdateEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
+			wantCalls: []string{"WithPodIdentifierLock", "UpdateEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
 		},
 	}
 
@@ -1355,23 +1355,23 @@ func TestUpdateClusterPolicyBPFMaps_FailClosed(t *testing.T) {
 			name:       "cluster rule-map failure short-circuits before pod-state",
 			ruleMapErr: ruleMapErr,
 			wantErr:    ruleMapErr,
-			wantCalls:  []string{"UpdateClusterPolicyEbpfMaps"},
+			wantCalls:  []string{"WithPodIdentifierLock", "UpdateClusterPolicyEbpfMaps"},
 		},
 		{
 			name:        "cluster pod-state failure surfaces",
 			podStateErr: podStateErr,
 			wantErr:     podStateErr,
-			wantCalls:   []string{"UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps"},
+			wantCalls:   []string{"WithPodIdentifierLock", "UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps"},
 		},
 		{
 			name:           "createIfNotExists seed failure surfaces",
 			createEntryErr: createEntryErr,
 			wantErr:        createEntryErr,
-			wantCalls:      []string{"UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
+			wantCalls:      []string{"WithPodIdentifierLock", "UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
 		},
 		{
 			name:      "happy path returns nil and runs the full sequence",
-			wantCalls: []string{"UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
+			wantCalls: []string{"WithPodIdentifierLock", "UpdateClusterPolicyEbpfMaps", "UpdatePodStateEbpfMaps", "CreatePodStateEbpfEntryIfNotExists"},
 		},
 	}
 

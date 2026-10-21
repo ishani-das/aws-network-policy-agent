@@ -533,24 +533,28 @@ func (r *PolicyEndpointsReconciler) deriveDefaultPodIsolation(policyEndpoint *po
 func (r *PolicyEndpointsReconciler) updateeBPFMaps(podIdentifier string,
 	ingressRules, egressRules []fwrp.EbpfFirewallRules, state int) error {
 
-	// Map Update should only happen once for those that share the same Map
-	err := r.ebpfClient.UpdateEbpfMaps(podIdentifier, ingressRules, egressRules)
-	if err != nil {
-		log().Errorf("Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
+	// Hold the per-podIdentifier lock across the whole "write rules, then flip
+	// pod_state" sequence so a concurrent writer.
+	return r.ebpfClient.WithPodIdentifierLock(podIdentifier, func() error {
+		// Map Update should only happen once for those that share the same Map
+		err := r.ebpfClient.UpdateEbpfMaps(podIdentifier, ingressRules, egressRules)
+		if err != nil {
+			log().Errorf("Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
 
-	err = r.GeteBPFClient().UpdatePodStateEbpfMaps(podIdentifier, ebpf.POD_STATE_MAP_KEY, state, true, true)
-	if err != nil {
-		log().Errorf("Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
+		err = r.GeteBPFClient().UpdatePodStateEbpfMaps(podIdentifier, ebpf.POD_STATE_MAP_KEY, state, true, true)
+		if err != nil {
+			log().Errorf("Map update(s) failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
 
-	if err := r.ebpfClient.CreatePodStateEbpfEntryIfNotExists(podIdentifier, ebpf.CLUSTER_POLICY_POD_STATE_MAP_KEY, ebpf.DEFAULT_ALLOW); err != nil {
-		log().Errorf("Cluster policy pod-state seed failed for podIdentifier %s: %v", podIdentifier, err)
-		return err
-	}
-	return nil
+		if err := r.ebpfClient.CreatePodStateEbpfEntryIfNotExists(podIdentifier, ebpf.CLUSTER_POLICY_POD_STATE_MAP_KEY, ebpf.DEFAULT_ALLOW); err != nil {
+			log().Errorf("Cluster policy pod-state seed failed for podIdentifier %s: %v", podIdentifier, err)
+			return err
+		}
+		return nil
+	})
 }
 
 func (r *PolicyEndpointsReconciler) deriveTargetPodsForParentNP(ctx context.Context,

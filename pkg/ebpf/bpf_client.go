@@ -135,6 +135,7 @@ type BpfClient interface {
 	CreatePodStateEbpfEntryIfNotExists(podIdentifier string, key int, state int) error
 	ClearDeletedPod(podNamespacedName string)
 	HasBPFContext(podIdentifier string) bool
+	WithPodIdentifierLock(podIdentifier string, fn func() error) error
 }
 
 type BPFContext struct {
@@ -709,6 +710,20 @@ func (l *bpfClient) getInterfaceCountForPod(pod types.NamespacedName, podIdentif
 
 	// No interface count available and multi-NIC enabled - skip attachment
 	return 0, errors.New("Skipping probe attach: multiNIC enabled and interface count is unknown")
+}
+
+// WithPodIdentifierLock runs fn while holding the per-podIdentifier mutex.
+// This is the same lock AttacheBPFProbes and DeleteBPFProbes take, so wrapping
+// the "write firewall rules, then flip pod_state to POLICIES_APPLIED" sequence
+// in it serializes that sequence against probe attach/detach and against other
+// writers for the same podIdentifier (the CNI RPC handler and the policy/
+// cluster-policy reconcilers all program the same shared maps concurrently).
+func (l *bpfClient) WithPodIdentifierLock(podIdentifier string, fn func() error) error {
+	value, _ := l.podIdentifierLock.LoadOrStore(podIdentifier, &sync.Mutex{})
+	podIdentifierLock := value.(*sync.Mutex)
+	podIdentifierLock.Lock()
+	defer podIdentifierLock.Unlock()
+	return fn()
 }
 
 func (l *bpfClient) AttacheBPFProbes(pod types.NamespacedName, podIdentifier string, numInterfaces int) error {
