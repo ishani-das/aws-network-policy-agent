@@ -351,7 +351,7 @@ func capturePolicyEvents(ctx context.Context, rd *ringbuf.Reader, ringMap *cebpf
 			if isDenyVerdict {
 				dropCountTotal.WithLabelValues(direction).Add(float64(1))
 				dropBytesTotal.WithLabelValues(direction).Add(float64(packetSz))
-			} else if !consumeNonDeny(debugEnabled, denyOnly) {
+			} else if false && !consumeNonDeny(debugEnabled, denyOnly) {
 				continue
 			}
 
