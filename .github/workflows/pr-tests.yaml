@@ -40,6 +40,16 @@ jobs:
         run: |
           make check-format
           make vet
+      - name: DEBUG builder BTF facts
+        run: |
+          echo "== kernel: $(uname -r)"
+          echo "== bpftool: $(bpftool version 2>/dev/null | head -1 || echo none)"
+          echo "== btf present: $(ls -la /sys/kernel/btf/vmlinux 2>&1)"
+          bpftool btf dump file /sys/kernel/btf/vmlinux format c 2>/dev/null > /tmp/vmlinux-debug.h || true
+          echo "== stream_vprintk decls in dumped vmlinux.h:"
+          grep -n "bpf_stream_vprintk" /tmp/vmlinux-debug.h || echo "(none)"
+          echo "== /usr/include/bpf/bpf_helpers.h decl:"
+          grep -n "bpf_stream_vprintk" /usr/include/bpf/bpf_helpers.h 2>/dev/null || echo "(no header)"
       - name: Build
         run: make build-linux
       - name: Unit test
